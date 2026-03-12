@@ -32,7 +32,8 @@ from typing import List, Dict, Generator
 # ============================================================
 # CONFIG
 # ============================================================
-BASE_DIR      = Path("~/Desktop/ThaiLegalLLM").expanduser()
+# Auto-detect BASE_DIR จาก script location — ใช้ได้ทุก machine
+BASE_DIR = Path(__file__).resolve().parent.parent
 RAW_DIR       = BASE_DIR / "data/raw"
 RAG_DIR       = BASE_DIR / "data/rag"
 INDEX_DIR     = RAG_DIR / "faiss_index"
@@ -88,113 +89,48 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE,
 
 
 # ============================================================
-# STREAMING LOADERS — yield ทีละ doc ไม่โหลดทั้งหมดพร้อมกัน
+# STREAMING LOADERS — อ่านจาก Cleaned JSONL
 # ============================================================
 def stream_all_docs() -> Generator[Dict, None, None]:
-    """Stream documents ทีละอัน เพื่อประหยัด RAM"""
+    """Stream documents จากไฟล์ที่ทำความสะอาดแล้ว"""
+    
+    cleaned_file = BASE_DIR / "data/cleaned/thai_legal_pretrain.jsonl"
+    if not cleaned_file.exists():
+        print(f"❌ ไม่พบไฟล์: {cleaned_file}")
+        print("   โปรดรัน scripts/download_data.py ก่อน")
+        return
 
-    # --- 1. ThaiLaw ---
-    print("📚 Streaming ThaiLaw...")
-    for fpath in glob.glob(str(RAW_DIR / "thailaw/**/*.parquet"), recursive=True):
-        df = pd.read_parquet(fpath, columns=["text", "title"])
-        for _, row in df.iterrows():
-            text  = str(row.get("text", ""))
-            title = str(row.get("title", ""))
-            if len(text) < 50:
-                continue
-            yield {
-                "text": f"{title}\n\n{text}" if title else text,
-                "source": "thailaw-v1.0",
-                "law_name": title,
-                "article": "",
-                "publish_date": ""
-            }
-        del df
-        gc.collect()
-
-    # --- 2. WangchanX ---
-    print("⚖️  Streaming WangchanX...")
-    for fpath in glob.glob(str(RAW_DIR / "wangchanx/**/*.parquet"), recursive=True):
-        df = pd.read_parquet(fpath, columns=["context", "question", "answer", "law_name", "article"])
-        for _, row in df.iterrows():
-            context  = str(row.get("context", ""))
-            law_name = str(row.get("law_name", ""))
-            if context and len(context) > 50:
-                yield {
-                    "text": context,
-                    "source": "wangchanx-legal",
-                    "law_name": law_name,
-                    "article": str(row.get("article", "")),
-                    "publish_date": ""
-                }
-        del df
-        gc.collect()
-
-    # --- 3. Ratchakitcha ---
-    print("📜 Streaming Ratchakitcha OCR...")
-    meta_index = {}
-    for mf in glob.glob(str(RAW_DIR / "ratchakitcha/meta/**/*.jsonl"), recursive=True):
-        with open(mf, encoding="utf-8") as fh:
-            for line in fh:
-                try:
-                    rec = json.loads(line)
-                    meta_index[rec.get("pdf_file", "")] = rec
-                except:
-                    pass
-
-    for fpath in glob.glob(str(RAW_DIR / "ratchakitcha/ocr/**/*.jsonl"), recursive=True):
-        with open(fpath, encoding="utf-8") as fh:
-            for line in fh:
-                try:
-                    rec      = json.loads(line)
-                    pdf_file = rec.get("pdf_file", "")
-                    text     = rec.get("text", "") or rec.get("ocr_text", "")
-                    meta     = meta_index.get(pdf_file, {})
-                    doctitle = meta.get("doctitle", "")
-
-                    if not any(kw in doctitle for kw in LEGAL_KEYWORDS):
-                        continue
-                    if len(text) < 100:
-                        continue
-
-                    yield {
-                        "text": f"{doctitle}\n\n{text}",
-                        "source": "soc-ratchakitcha",
-                        "law_name": doctitle,
-                        "article": "",
-                        "publish_date": str(meta.get("publishDate", ""))
-                    }
-                except:
-                    pass
-
-    # --- 4. CSV ---
-    print("📋 Streaming CSV folder...")
-    csv_files = glob.glob(str(RAW_DIR / "csv/**/*.csv"), recursive=True)
-    csv_files += glob.glob(str(RAW_DIR / "csv/*.csv"))
-    for fpath in csv_files:
-        law_name = Path(fpath).stem.replace("_", " ").strip()
-        try:
-            df = pd.read_csv(fpath)
-            if "text" not in df.columns:
-                continue
-            if "is-cancelled" in df.columns:
-                df = df[df["is-cancelled"].isna() | (df["is-cancelled"] == "")]
-            for _, row in df.iterrows():
-                text    = str(row.get("text", ""))
-                article = str(row.get("article", ""))
-                if len(text) < 20:
+    print("📚 Streaming data from cleaned dataset...")
+    
+    with open(cleaned_file, "r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                rec = json.loads(line)
+                text = rec.get("text", "").strip()
+                source = rec.get("source", "unknown")
+                
+                if len(text) < 50:
                     continue
+                    
+                # พยายามดึงชื่อกฎหมายจากบรรทัดแรกของ text
+                # เพราะส่วนใหญ่ document จะขึ้นต้นด้วยชื่อเรื่อง
+                law_name = text.split('\n')[0].strip()
+                if len(law_name) > 100:  # ถ้ายาวเกินไป อาจจะไม่ใช่ชื่อเรื่อง
+                    law_name = "Legal Document"
+                
+                # ถ้ามาจาก wangchanx-legal-qa ให้ใช้ source ตรงๆ เป็นชื่อ
+                if "qa" in source:
+                    law_name = "Q&A Legal Knowledge"
+                    
                 yield {
                     "text": text,
-                    "source": "csv-law",
+                    "source": source,
                     "law_name": law_name,
-                    "article": article,
+                    "article": "",
                     "publish_date": ""
                 }
-            del df
-            gc.collect()
-        except Exception as e:
-            print(f"  ⚠️  {fpath}: {e}")
+            except Exception:
+                continue
 
 
 # ============================================================
