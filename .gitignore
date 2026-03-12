@@ -1,0 +1,33 @@
+# Data — ไม่ push ขึ้น GitHub
+data/
+
+# Model weights
+models/
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Jupyter / notebooks checkpoints
+.ipynb_checkpoints/
+*.ipynb
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+wandb/
+runs/
+
+# HuggingFace cache
+.cache/
