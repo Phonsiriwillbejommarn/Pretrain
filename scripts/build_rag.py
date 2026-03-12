@@ -89,10 +89,10 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE,
 
 
 # ============================================================
-# STREAMING LOADERS — อ่านจาก Cleaned JSONL
+# STREAMING LOADERS — อ่านจาก Cleaned JSONL (ฉบับเร่งด่วน Hackathon)
 # ============================================================
 def stream_all_docs() -> Generator[Dict, None, None]:
-    """Stream documents จากไฟล์ที่ทำความสะอาดแล้ว"""
+    """Stream documents จากไฟล์ที่ทำความสะอาดแล้ว (คัดเฉพาะเนื้อๆ)"""
     
     cleaned_file = BASE_DIR / "data/cleaned/thai_legal_pretrain.jsonl"
     if not cleaned_file.exists():
@@ -100,10 +100,20 @@ def stream_all_docs() -> Generator[Dict, None, None]:
         print("   โปรดรัน scripts/download_data.py ก่อน")
         return
 
-    print("📚 Streaming data from cleaned dataset...")
+    print("📚 Streaming HACKATHON-OPTIMIZED data from cleaned dataset...")
+    
+    # กำหนด Keyword กฎหมายหลักที่เราอยากได้จริงๆ (ตัดพวกประกาศจุกจิกทิ้ง)
+    HIGH_VALUE_KEYWORDS = ["พระราชบัญญัติ", "ประมวลกฎหมาย", "รัฐธรรมนูญ", "พระราชกฤษฎีกา"]
+    
+    doc_count = 0
+    MAX_DOCS = 50000  # จำกัดจำนวณ Doc เอาแค่ 50,000 พอ (เสร็จใน < 30 นาที)
     
     with open(cleaned_file, "r", encoding="utf-8") as f:
         for line in f:
+            if doc_count >= MAX_DOCS:
+                print(f"\n🎯 Reached target limit of {MAX_DOCS} high-value documents. Stopping stream.")
+                break
+                
             try:
                 rec = json.loads(line)
                 text = rec.get("text", "").strip()
@@ -113,15 +123,27 @@ def stream_all_docs() -> Generator[Dict, None, None]:
                     continue
                     
                 # พยายามดึงชื่อกฎหมายจากบรรทัดแรกของ text
-                # เพราะส่วนใหญ่ document จะขึ้นต้นด้วยชื่อเรื่อง
                 law_name = text.split('\n')[0].strip()
-                if len(law_name) > 100:  # ถ้ายาวเกินไป อาจจะไม่ใช่ชื่อเรื่อง
+                if len(law_name) > 100:
                     law_name = "Legal Document"
                 
-                # ถ้ามาจาก wangchanx-legal-qa ให้ใช้ source ตรงๆ เป็นชื่อ
+                # กรองเอาเฉพาะข้อมูลเกรด A สำหรับ Hackathon
+                keep = False
+                
+                # 1. เอาทั้งหมดที่เป็น Q&A (เพราะตรงกับปัญหา ปชช. มากสุด)
                 if "qa" in source:
                     law_name = "Q&A Legal Knowledge"
+                    keep = True
+                
+                # 2. เอาเฉพาะกฎหมายฉบับหลักๆ (ดูจากชื่อกฎหมาย)
+                elif any(kw in law_name for kw in HIGH_VALUE_KEYWORDS):
+                    keep = True
                     
+                if not keep:
+                    continue # ข้ามไฟล์ที่ไม่ตรงสเปคไปเลย
+                    
+                doc_count += 1
+                
                 yield {
                     "text": text,
                     "source": source,
