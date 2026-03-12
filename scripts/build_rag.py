@@ -46,11 +46,11 @@ import torch
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"🖥️  Device: {DEVICE}" + (f" ({torch.cuda.get_device_name(0)})" if DEVICE == "cuda" else " (CPU — slow)"))
 
-CHUNK_SIZE    = 512
-CHUNK_OVERLAP = 64
-# H100/GPU: batch ใหญ่ได้, Mac CPU: เล็กเพื่อป้องกัน segfault
-EMBED_BATCH   = 256 if DEVICE == "cuda" else 8
-ADD_BATCH     = 5000 if DEVICE == "cuda" else 200
+CHUNK_SIZE    = 1024
+CHUNK_OVERLAP = 128
+# H100/GPU: อัด batch ให้เต็ม 80GB VRAM, Mac CPU: เล็กเพื่อป้องกัน segfault
+EMBED_BATCH   = 1024 if DEVICE == "cuda" else 8
+ADD_BATCH     = 10000 if DEVICE == "cuda" else 200
 
 LEGAL_KEYWORDS = [
     "พระราชบัญญัติ", "พระราชกำหนด", "พระราชกฤษฎีกา",
@@ -147,7 +147,7 @@ def build_index():
 
     print("\n🤖 Loading BGE-M3 model...")
     model = SentenceTransformer("BAAI/bge-m3", device=DEVICE)
-    model.max_seq_length = 512
+    model.max_seq_length = 1024
 
     index = None   # สร้างตอนรู้ dimension จาก batch แรก
     chunk_id = 0
