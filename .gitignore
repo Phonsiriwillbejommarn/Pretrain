@@ -1,5 +1,9 @@
-# Data — ไม่ push ขึ้น GitHub
+# Data — ไม่ push ขึ้น GitHub (ยกเว้น .gitkeep เพื่อเก็บ folder structure)
 data/
+!data/.gitkeep
+!data/raw/.gitkeep
+!data/cleaned/.gitkeep
+!data/rag/.gitkeep
 
 # Model weights
 models/
