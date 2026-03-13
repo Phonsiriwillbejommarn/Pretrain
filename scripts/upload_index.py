@@ -6,7 +6,7 @@ Upload RAG Index to HuggingFace
 
 import sys
 from pathlib import Path
-from huggingface_hub import HfApi, login
+from huggingface_hub import HfApi, login, create_repo
 
 # ตั้งค่า path
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -32,6 +32,14 @@ def upload_rag_index(token):
         print("🔑 Logging in to HuggingFace...")
         login(token=token)
         
+        # สร้าง Repo ถ้ายังไม่มี (กันเหนียว)
+        print(f"📦 Checking/Creating repo '{REPO_ID}'...")
+        try:
+            create_repo(repo_id=REPO_ID, repo_type="dataset", private=True, exist_ok=True)
+            print("   Repo is ready!")
+        except Exception as e:
+            print(f"   Note on repo creation: {e}")
+            
         api = HfApi()
         
         # Upload metadata
