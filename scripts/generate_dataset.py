@@ -73,18 +73,16 @@ except Exception as e:
     print(f"❌ Error loading dataset: {e}")
     questions = []
 
-SYSTEM_PROMPT = """คุณเป็นผู้ช่วยด้านกฎหมายไทยที่มีความเชี่ยวชาญสูง
+SYSTEM_PROMPT_R1 = """คุณเป็นผู้ช่วยด้านกฎหมายไทย 
+หน้าที่: วิเคราะห์คำถามแล้วสร้างคำสั่งค้นหาข้อมูล
+ข้อบังคับ: ตอบเป็น JSON ในรูปแบบ <tool_call>{"name": "search_law", "query": "คำค้นหา"}</tool_call> เพียงอย่างเดียว ห้ามมีข้อความอื่น"""
 
-ข้อห้ามเด็ดขาด: ห้ามใช้ความรู้รอบตัว ให้ตอบคำถามโดยอ้างอิงจากข้อมูลที่เครื่องมือ (search_law) หามาให้เท่านั้น
-
-กระบวนการทำงานของคุณมี 2 ขั้นตอน (คุณจะได้รับแบะแสสถานะจาก User):
-[สถานะ: ต้องการค้นหา] (Round 1)
-ให้คุณพิมพ์แค่คำสั่งค้นหาในรูปแบบนี้เท่านั้น:
-<tool_call>{"name": "search_law", "query": "คำสำคัญที่ต้องการค้นหา"}</tool_call>
-
-[สถานะ: ได้รับข้อมูลแล้ว] (Round 2)
-คุณจะได้รับข้อความที่ขึ้นต้นด้วย "ข้อมูลจากระบบ:"
-เมื่อได้รับแล้ว ห้ามพิมพ์ <tool_call> อีกเด็ดขาด ให้เริ่มคิดในแท็ก <think>...</think> เพื่อวิเคราะห์ข้อกฎหมายที่ได้รับมา จากนั้นจึงพิมพ์คำตอบสุดท้าย"""
+SYSTEM_PROMPT_R2 = """คุณคือผู้เชี่ยวชาญกฎหมายไทยที่มีความละเอียดรอบคอบ
+หน้าที่: ตอบคำถามโดยใช้อ้างอิงจากข้อมูลกฎหมายที่ได้รับเท่านั้น
+กติกา:
+1. เริ่มต้นด้วยการวิเคราะห์ในแท็ก <think>...</think> (วิเคราะห์มาตราที่เกี่ยวข้องและข้อเท็จจริง)
+2. สรุปคำตอบสุดท้ายให้ชัดเจนและเป็นทางการ
+3. ห้ามเรียกใช้ tool หรือ search_law ซ้ำ"""
 
 # ==========================================
 # 🔍 FAISS SEARCH
@@ -153,19 +151,18 @@ def main():
                 print(f"\n{'='*60}")
                 print(f"📝 [{generated_count+1}/{TOTAL_SAMPLES}] คำถาม: {question}")
 
-                # ── Round 1: Model คิดว่าต้องค้นหาอะไร ──
-                messages = [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                # ── Round 1: ต้องการแค่ <tool_call> ──
+                messages_r1 = [
+                    {"role": "system", "content": SYSTEM_PROMPT_R1},
                     {"role": "user", "content": question}
                 ]
                 print("\n🤖 [Round 1] Thinking what to search...")
-                response1 = api_call(messages, max_tokens=1024, temperature=0.2)
+                response1 = api_call(messages_r1, max_tokens=512, temperature=0.1)
 
                 # ── Parse tool call ──
                 search_query = parse_tool_call(response1)
                 if not search_query:
-                    # ฟอลแบ็ค เผื่อ Model ดื้อไม่ยอมเข้า Tool format
-                    search_query = question
+                    search_query = question # fallback
                 
                 print(f"\n🔍 [Tool Calling] FAISS Search query: '{search_query}'")
 
@@ -173,32 +170,36 @@ def main():
                 context = faiss_search(search_query, top_k=3)
                 print(f"📚 Retrieved {len(context)} chars of authentic Thai Law context!")
 
-                # ── Round 2: ส่ง history + context พ่นข้อมูลจริง → Model ตอบ ──
-                messages.append({"role": "assistant", "content": response1})
-                messages.append({
-                    "role": "user", 
-                    "content": f"[สถานะ: ได้รับข้อมูลแล้ว]\nข้อมูลจากระบบ:\n{context}\n\nคำสั่งบังคับ: ห้ามใช้ <tool_call> อีกเด็ดขาด ให้เริ่มตอบโดยใช้ <think> คิดวิเคราะห์ข้อมูลข้างต้น แล้วให้คำตอบที่ชัดเจน"
-                })
+                # ── Round 2: ต้องการคิดและตอบ (Fresh Prompt เพื่อกัน Loop) ──
+                messages_r2 = [
+                    {"role": "system", "content": SYSTEM_PROMPT_R2},
+                    {"role": "user", "content": f"คำถาม: {question}\n\nข้อมูลอ้างอิง:\n{context}\n\nคำสั่ง: วิเคราะห์ใน <think> แล้วตอบคำถาม"}
+                ]
 
                 print("\n🤖 [Round 2] Generating final reasoning and answer...")
-                response2 = api_call(messages, max_tokens=4096, temperature=0.5)
+                response2 = api_call(messages_r2, max_tokens=4096, temperature=0.7)
 
-                # ── Save Dataset ──
+                # ── Stitch together for SFT format ──
+                # เราใช้ format ที่ User กำหนดไว้เพื่อให้ตอน inference ใช้งานได้จริง
+                context_message = f"""[สถานะ: ข้อมูลจากฐานข้อมูลกฎหมาย - การค้นหาเสร็จสมบูรณ์]
+{context}
+
+---
+คำสั่ง: คุณได้รับข้อมูลเพียงพอแล้ว ห้ามใช้ search_law ซ้ำเด็ดขาด เพราะจะเกิดข้อผิดพลาดของระบบ
+ให้เริ่มคิดวิเคราะห์ใน <think>...</think> และให้คำตอบสุดท้ายทันที"""
+
                 entry = {
-                    "id": f"thailaw_sft_{i}",
+                    "id": f"thailaw_sft_{i}_{int(time.time())}",
                     "messages": [
                         {"role": "user", "content": question},
                         {"role": "assistant", "content": response1},
-                        {
-                            "role": "user", 
-                            "content": f"ข้อมูลจากระบบ (ใช้ตอบได้เลย ไม่ต้องค้นหาเพิ่ม):\n{context}\n\nกรุณาตอบคำถามโดยอ้างอิงข้อมูลข้างต้น"
-                        },
+                        {"role": "user", "content": context_message},
                         {"role": "assistant", "content": response2}
                     ]
                 }
                 json.dump(entry, f, ensure_ascii=False)
                 f.write("\n")
-                f.flush() # บันทึกลงดิสก์ทันที เผื่อหลุดกลางคัน
+                f.flush()
 
                 generated_count += 1
                 error_count = 0
