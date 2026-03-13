@@ -22,9 +22,9 @@ mkdir -p $OUTPUT_DIR
 mkdir -p "../data/cleaned"
 
 # --- Cloud Data Pull ---
-echo "📥 Downloading dataset from Hugging Face Hub..."
+echo "📥 Downloading dataset from Hugging Face Hub (via Python)..."
 export HF_TOKEN=$HF_TOKEN
-huggingface-cli download $DATASET_REPO thai_legal_pretrain.jsonl --local-dir "../data/cleaned" --local-dir-use-symlinks False
+python download_cpt_data.py --repo_id "$DATASET_REPO" --filename "thai_legal_pretrain.jsonl" --local-dir "../data/cleaned"
 # ----------------------
 
 # Hyperparameters
