@@ -74,11 +74,13 @@ except Exception as e:
     questions = []
 
 SYSTEM_PROMPT = """คุณเป็นผู้เชี่ยวชาญกฎหมายไทย มี tool ให้ใช้ 1 อย่างคือ search_law
-เมื่อต้องการค้นหาข้อมูลกฎหมาย ให้ตอบในรูปแบบนี้เท่านั้น:
+
+กระบวนการ:
+1. เมื่อได้รับคำถาม ให้ค้นหาข้อมูลก่อน โดยตอบในรูปแบบ:
 <tool_call>{"name": "search_law", "query": "คำค้นหา"}</tool_call>
 
-เมื่อได้รับข้อมูลจาก tool แล้ว ให้คิดวิเคราะห์ใน <think>...</think> แล้วตอบคำถาม
-อ้างอิงจาก context ที่ได้รับเท่านั้น ห้าม hallucinate"""
+2. เมื่อได้รับข้อมูลจาก tool แล้ว ให้วิเคราะห์ใน <think>...</think> แล้วตอบคำถาม
+   ห้ามเรียก tool อีกครั้ง อ้างอิงจาก context ที่ได้รับเท่านั้น"""
 
 # ==========================================
 # 🔍 FAISS SEARCH
@@ -169,8 +171,10 @@ def main():
 
                 # ── Round 2: ส่ง history + context พ่นข้อมูลจริง → Model ตอบ ──
                 messages.append({"role": "assistant", "content": response1})
-                messages.append({"role": "user", "content": f"ข้อมูลจากการค้นหา:\n{context}"})
-                messages.append({"role": "user", "content": "ประมวลผลข้อมูลและตอบคำถามโดยอ้างอิงข้อมูลที่ได้รับข้างต้น"})
+                messages.append({
+                    "role": "user", 
+                    "content": f"ข้อมูลจากระบบ (ใช้ตอบได้เลย ไม่ต้องค้นหาเพิ่ม):\n{context}\n\nกรุณาตอบคำถามโดยอ้างอิงข้อมูลข้างต้น"
+                })
 
                 print("\n🤖 [Round 2] Generating final reasoning and answer...")
                 response2 = api_call(messages, max_tokens=4096, temperature=0.5)
@@ -181,7 +185,10 @@ def main():
                     "messages": [
                         {"role": "user", "content": question},
                         {"role": "assistant", "content": response1},
-                        {"role": "user", "content": f"ข้อมูลจากการค้นหา:\n{context}"},
+                        {
+                            "role": "user", 
+                            "content": f"ข้อมูลจากระบบ (ใช้ตอบได้เลย ไม่ต้องค้นหาเพิ่ม):\n{context}\n\nกรุณาตอบคำถามโดยอ้างอิงข้อมูลข้างต้น"
+                        },
                         {"role": "assistant", "content": response2}
                     ]
                 }
