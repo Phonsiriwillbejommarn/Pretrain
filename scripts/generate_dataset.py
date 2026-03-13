@@ -163,7 +163,7 @@ def main():
 
                 # ── Round 2: ส่ง history + context พ่นข้อมูลจริง → Model ตอบ ──
                 messages.append({"role": "assistant", "content": response1})
-                messages.append({"role": "tool", "content": context})
+                messages.append({"role": "user", "content": f"ข้อมูลจากการค้นหา:\n{context}"})
                 messages.append({"role": "user", "content": "ประมวลผลข้อมูลและตอบคำถามโดยอ้างอิงข้อมูลที่ได้รับข้างต้น"})
 
                 print("\n🤖 [Round 2] Generating final reasoning and answer...")
@@ -175,7 +175,7 @@ def main():
                     "messages": [
                         {"role": "user", "content": question},
                         {"role": "assistant", "content": response1},
-                        {"role": "tool", "content": context},
+                        {"role": "user", "content": f"ข้อมูลจากการค้นหา:\n{context}"},
                         {"role": "assistant", "content": response2}
                     ]
                 }
