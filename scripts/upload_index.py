@@ -14,7 +14,7 @@ RAG_DIR = BASE_DIR / "data/rag"
 INDEX_FILE = RAG_DIR / "faiss_index/legal.index"
 METADATA_FILE = RAG_DIR / "chunks_metadata.jsonl"
 
-REPO_ID = "Phonsiriwillbejommarn/thai-legal-pretrain"
+REPO_ID = "Phonsiri/thai-55555-pretrain"
 
 def upload_rag_index(token):
     print("=" * 60)
