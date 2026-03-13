@@ -28,10 +28,10 @@ huggingface-cli download $DATASET_REPO thai_legal_pretrain.jsonl --local-dir "..
 # ----------------------
 
 # Hyperparameters
-MAX_SEQ_LENGTH=4096
+MAX_SEQ_LENGTH=2048
 NUM_EPOCHS=1
 BATCH_SIZE=2                         # per-device batch size
-GRAD_ACCUM=16                        # effective batch = 32
+GRAD_ACCUM=32                        # effective batch = 64 (เพิ่มเพื่อรักษา stability เมื่อ seq len ลดลง)
 LR=2e-5                              # CPT LR
 
 CUDA_VISIBLE_DEVICES=0 python train.py \
