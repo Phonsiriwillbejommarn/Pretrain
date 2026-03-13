@@ -153,7 +153,7 @@ def main():
                     {"role": "user", "content": question}
                 ]
                 print("\n🤖 [Round 1] Thinking what to search...")
-                response1 = api_call(messages, max_tokens=200, temperature=0.2)
+                response1 = api_call(messages, max_tokens=1024, temperature=0.2)
 
                 # ── Parse tool call ──
                 search_query = parse_tool_call(response1)
@@ -173,7 +173,7 @@ def main():
                 messages.append({"role": "user", "content": "ประมวลผลข้อมูลและตอบคำถามโดยอ้างอิงข้อมูลที่ได้รับข้างต้น"})
 
                 print("\n🤖 [Round 2] Generating final reasoning and answer...")
-                response2 = api_call(messages, max_tokens=2048, temperature=0.5)
+                response2 = api_call(messages, max_tokens=4096, temperature=0.5)
 
                 # ── Save Dataset ──
                 entry = {
