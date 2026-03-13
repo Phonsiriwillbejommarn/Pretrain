@@ -73,14 +73,18 @@ except Exception as e:
     print(f"❌ Error loading dataset: {e}")
     questions = []
 
-SYSTEM_PROMPT = """คุณเป็นผู้เชี่ยวชาญกฎหมายไทย มี tool ให้ใช้ 1 อย่างคือ search_law
+SYSTEM_PROMPT = """คุณเป็นผู้ช่วยด้านกฎหมายไทยที่มีความเชี่ยวชาญสูง
 
-กระบวนการ:
-1. เมื่อได้รับคำถาม ให้ค้นหาข้อมูลก่อน โดยตอบในรูปแบบ:
-<tool_call>{"name": "search_law", "query": "คำค้นหา"}</tool_call>
+ข้อห้ามเด็ดขาด: ห้ามใช้ความรู้รอบตัว ให้ตอบคำถามโดยอ้างอิงจากข้อมูลที่เครื่องมือ (search_law) หามาให้เท่านั้น
 
-2. เมื่อได้รับข้อมูลจาก tool แล้ว ให้วิเคราะห์ใน <think>...</think> แล้วตอบคำถาม
-   ห้ามเรียก tool อีกครั้ง อ้างอิงจาก context ที่ได้รับเท่านั้น"""
+กระบวนการทำงานของคุณมี 2 ขั้นตอน (คุณจะได้รับแบะแสสถานะจาก User):
+[สถานะ: ต้องการค้นหา] (Round 1)
+ให้คุณพิมพ์แค่คำสั่งค้นหาในรูปแบบนี้เท่านั้น:
+<tool_call>{"name": "search_law", "query": "คำสำคัญที่ต้องการค้นหา"}</tool_call>
+
+[สถานะ: ได้รับข้อมูลแล้ว] (Round 2)
+คุณจะได้รับข้อความที่ขึ้นต้นด้วย "ข้อมูลจากระบบ:"
+เมื่อได้รับแล้ว ห้ามพิมพ์ <tool_call> อีกเด็ดขาด ให้เริ่มคิดในแท็ก <think>...</think> เพื่อวิเคราะห์ข้อกฎหมายที่ได้รับมา จากนั้นจึงพิมพ์คำตอบสุดท้าย"""
 
 # ==========================================
 # 🔍 FAISS SEARCH
@@ -115,7 +119,7 @@ def api_call(messages, max_tokens=2048, temperature=0.6):
         messages=messages,
         temperature=temperature,
         max_completion_tokens=max_tokens,
-        top_p=0.6,
+        top_p=0.8,
         stream=True
     )
     result = ""
@@ -173,7 +177,7 @@ def main():
                 messages.append({"role": "assistant", "content": response1})
                 messages.append({
                     "role": "user", 
-                    "content": f"ข้อมูลจากระบบ (ใช้ตอบได้เลย ไม่ต้องค้นหาเพิ่ม):\n{context}\n\nกรุณาตอบคำถามโดยอ้างอิงข้อมูลข้างต้น"
+                    "content": f"[สถานะ: ได้รับข้อมูลแล้ว]\nข้อมูลจากระบบ:\n{context}\n\nคำสั่งบังคับ: ห้ามใช้ <tool_call> อีกเด็ดขาด ให้เริ่มตอบโดยใช้ <think> คิดวิเคราะห์ข้อมูลข้างต้น แล้วให้คำตอบที่ชัดเจน"
                 })
 
                 print("\n🤖 [Round 2] Generating final reasoning and answer...")
