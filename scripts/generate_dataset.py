@@ -61,7 +61,13 @@ with open(METADATA_FILE, "r", encoding="utf-8") as f:
 print("\n📥 Downloading Questions from HF 'mekpro/thailawsqa'...")
 try:
     qa_dataset = load_dataset("mekpro/thailawsqa", split="train")
-    questions = qa_dataset["question"]
+    # Dataset นี้มีคอลัมน์ 'messages' ซึ่งเป็น List ของ dict [{'role': 'user', 'content': 'คำถาม'}, ...]
+    questions = []
+    for row in qa_dataset["messages"]:
+        for msg in row:
+            if msg.get("role") == "user":
+                questions.append(msg.get("content", ""))
+                break
     print(f"   - Fetched {len(questions)} questions")
 except Exception as e:
     print(f"❌ Error loading dataset: {e}")
