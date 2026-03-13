@@ -179,6 +179,15 @@ def main():
                 print("\n🤖 [Round 2] Generating final reasoning and answer...")
                 response2 = api_call(messages_r2, max_tokens=4096, temperature=0.7)
 
+                # 🏁 Filtering & Cleaning (ป้องกันข้อมูลขยะ)
+                if len(response2) < 100:
+                    print(f"⚠️ Response too short ({len(response2)} chars), skipping...")
+                    continue
+
+                # ล้างขยะพวก <tool_call> ที่หลุดมาต้นประโยค
+                response2_clean = re.sub(r'^<tool_call>.*?</tool_call>\s*', '', response2, flags=re.DOTALL).strip()
+                response2_clean = re.sub(r'^<tool_call>\s*', '', response2_clean).strip()
+
                 # ── Stitch together for SFT format ──
                 # เราใช้ format ที่ User กำหนดไว้เพื่อให้ตอน inference ใช้งานได้จริง
                 context_message = f"""[สถานะ: ข้อมูลจากฐานข้อมูลกฎหมาย - การค้นหาเสร็จสมบูรณ์]
@@ -194,7 +203,7 @@ def main():
                         {"role": "user", "content": question},
                         {"role": "assistant", "content": response1},
                         {"role": "user", "content": context_message},
-                        {"role": "assistant", "content": response2}
+                        {"role": "assistant", "content": response2_clean}
                     ]
                 }
                 json.dump(entry, f, ensure_ascii=False)
