@@ -4,6 +4,10 @@
 #  สำหรับ GPU VRAM ≥ 80GB (A100/H100/H200)
 # ============================================================
 
+# หาตำแหน่งของสคริปต์นี้
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cd "$SCRIPT_DIR"
+
 MODEL="Qwen/Qwen3.5-9B-Base"
 DATA_PATH="../data/cleaned/thai_legal_pretrain.jsonl"
 OUTPUT_DIR="./output/qwen3.5-9b-thai-law-cpt"
@@ -24,7 +28,7 @@ mkdir -p "../data/cleaned"
 # --- Cloud Data Pull ---
 echo "📥 Downloading dataset from Hugging Face Hub (via Python)..."
 export HF_TOKEN=$HF_TOKEN
-python download_cpt_data.py --repo_id "$DATASET_REPO" --filename "thai_legal_pretrain.jsonl" --local-dir "../data/cleaned"
+python "$SCRIPT_DIR/download_cpt_data.py" --repo_id "$DATASET_REPO" --filename "thai_legal_pretrain.jsonl" --local-dir "$SCRIPT_DIR/../data/cleaned"
 # ----------------------
 
 # Hyperparameters

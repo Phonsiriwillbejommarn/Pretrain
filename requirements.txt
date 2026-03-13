@@ -18,3 +18,4 @@ einops
 
 # For data processing
 jsonlines
+huggingface_hub
