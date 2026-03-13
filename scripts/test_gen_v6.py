@@ -29,7 +29,7 @@ INDEX_DIR = RAG_DIR / "faiss_index"
 METADATA_FILE = RAG_DIR / "chunks_metadata.jsonl"
 OUTPUT_FILE = BASE_DIR / "data/thai_law_dataset.jsonl"
 
-TOTAL_SAMPLES = 5000  # จำนวนข้อที่อยากเจน
+TOTAL_SAMPLES = 1  # จำนวนข้อที่อยากเจน
 DELAY_SECONDS = 0.5   # หน่วงเวลากัน API ยิงถี่ไป
 
 # ==========================================
@@ -73,43 +73,24 @@ except Exception as e:
     print(f"❌ Error loading dataset: {e}")
     questions = []
 
-SYSTEM_PROMPT_R1 = """คุณเป็นผู้ช่วยผู้เชี่ยวชาญด้านกฎหมายไทย และคุณต้องสื่อสารเป็น "ภาษาไทย" เท่านั้น
-หน้าที่: วิเคราะห์คำถามแล้วสร้างคำสั่งค้นหาข้อมูล
-ข้อบังคับ: ตอบเป็น JSON ในรูปแบบ <tool_call>{"name": "search_law", "query": "คำค้นหา"}</tool_call> เพียงอย่างเดียว ห้ามมีข้อความอื่น"""
+SYSTEM_PROMPT = """คุณเป็นผู้ช่วยผู้เชี่ยวชาญด้านกฎหมายไทย และคุณต้องสื่อสารเป็น "ภาษาไทย" เท่านั้น
 
-SYSTEM_PROMPT_R2 = """คุณเป็นผู้ช่วยด้านกฎหมายไทย ตอบเป็นภาษาไทยเท่านั้น
+[Round 1] เมื่อได้รับคำถาม ให้ใช้เครื่องมือค้นหาโดยพิมพ์ในรูปแบบนี้เท่านั้น:
+<tool_call>{"name": "search_law", "query": "คำค้นหา"}</tool_call>
 
-[Round 2] เมื่อได้รับข้อมูลกฎหมายแล้ว ให้วิเคราะห์อย่างละเอียดใน <think> และสรุปคำตอบใน คำตอบ:
+[Round 2] เมื่อได้รับข้อมูลกฎหมายมาแล้ว ***ห้ามใช้เครื่องมือค้นหาซ้ำอีกเด็ดขาด*** 
+คุณจะต้องเริ่มทำการวิเคราะห์ข้อมูลในทันทีโดยใช้รูปแบบดังนี้:
 
-กติกาที่ต้องปฏิบัติตามอย่างเคร่งครัด:
-1. ตอบตามข้อมูลที่ให้มา (context) เท่านั้น ห้ามจดจำมาตราหรือความรู้เก่ามาตอบเอง
-2. ห้ามสร้างเลขมาตรา (เช่น มาตรา 398, 399) ที่ไม่มีอยู่ในข้อมูลที่ได้รับเด็ดขาด
-3. หากข้อมูลที่ได้รับไม่ครอบคลุมคำถาม หรือไม่พบข้อมูลที่ต้องการ ให้ตอบใน <think> ว่าไม่พบ และใน คำตอบ ให้ระบุว่า:
-   "ไม่พบข้อมูลที่ตรงกับคำถามในฐานข้อมูลกฎหมายเบื้องต้น แนะนำให้ปรึกษาผู้เชี่ยวชาญด้านกฎหมายหรือทนายความเพื่อความชัดเจน"
-4. ทุกตอบต้องมีโครงสร้าง:
-   <think>
-   (วิเคราะห์)
-   </think>
-   คำตอบ: (สรุป)
-5. ทุกอย่างต้องเป็นภาษาไทย 100%
-
-รูปแบบการตอบ:
 <think>
-[วิเคราะห์ข้อมูลที่ได้รับเท่านั้น]
+[วิเคราะห์ข้อกฎหมายที่ได้รับ โดยเชื่อมโยงกับคำถามของ User]
 </think>
-คำตอบ: [สรุปคำตอบตามข้อมูล หรือ Safe Fallback]
+คำตอบ: [สรุปคำตอบสุดท้ายให้ชัดเจนเป็นภาษาไทย]
 
-ตัวอย่าง (กรณีพบข้อมูล):
+ตัวอย่างการตอบใน Round 2:
 <think>
-จากเนื้อหามาตรา 41 ที่ปรากฏในข้อมูล ระบุว่าการเปิดเผยข้อเท็จจริง... มีโทษจำคุก...
+จากข้อมูลที่ได้รับ มาตรา 41 แห่ง พ.ร.บ. ฟื้นฟูสมรรถภาพฯ บัญญัติว่า ผู้ใดนำข้อเท็จจริงที่ได้มาจากการปฏิบัติตาม พ.ร.บ. นี้ไปเปิดเผย ต้องระวางโทษจำคุกไม่เกินห้าปี หรือปรับไม่เกินหนึ่งแสนบาท กรณีนี้จึงเข้าข่ายการเปิดเผยความลับทางราชการตามมาตราดังกล่าว
 </think>
-คำตอบ: ระวางโทษจำคุกไม่เกิน 5 ปี หรือปรับไม่เกิน 1 แสนบาท
-
-ตัวอย่าง (กรณีไม่พบข้อมูล):
-<think>
-จากการตรวจสอบข้อมูลกฎหมายที่ได้รับ ไม่พบข้อความที่ระบุถึงบทลงโทษเกี่ยวกับ... มาตราที่ปรากฏในฐานข้อมูลกล่าวถึงเพียงเรื่อง... เท่านั้น
-</think>
-คำตอบ: ไม่พบข้อมูลที่ตรงกับคำถามในฐานข้อมูลกฎหมายเบื้องต้น แนะนำให้ปรึกษาผู้เชี่ยวชาญด้านกฎหมายหรือทนายความเพื่อความชัดเจน"""
+คำตอบ: ผู้กระทำผิดต้องระวางโทษจำคุกไม่เกิน 5 ปี หรือปรับไม่เกิน 100,000 บาท หรือทั้งจำทั้งปรับ"""
 
 # ==========================================
 # 🔍 FAISS SEARCH
@@ -180,7 +161,7 @@ def main():
 
                 # ── Round 1: ต้องการแค่ <tool_call> ──
                 messages_r1 = [
-                    {"role": "system", "content": SYSTEM_PROMPT_R1},
+                    {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": question}
                 ]
                 print("\n🤖 [Round 1] Thinking what to search...")
@@ -197,63 +178,30 @@ def main():
                 context = faiss_search(search_query, top_k=3)
                 print(f"📚 Retrieved {len(context)} chars of authentic Thai Law context!")
 
-                # ── Round 2: คิดและตอบ (SFT Format Enforcement) ──
-                prefill_text = "<think>\n"
+                # ── Round 2: ต้องการคิดและตอบ (Fresh Prompt เพื่อกัน Loop) ──
                 messages_r2 = [
-                    {"role": "system", "content": SYSTEM_PROMPT_R2},
-                    {"role": "user", "content": f"""ข้อมูลกฎหมายประกอบการวิเคราะห์:
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": f"""[ขั้นตอนสุดท้าย: ให้คำปรึกษา]
+คำถาม: {question}
+
+ข้อมูลอ้างอิงจากกฎหมาย:
 {context}
 
-คำถาม: {question}"""},
-                    {"role": "assistant", "content": prefill_text} 
+---
+คำสั่ง: ห้ามค้นหาเพิ่ม ให้ใช้ข้อมูลด้านบนเริ่มเขียนวิเคราะห์ใน <think>...</think> ทันที และตอบเป็นภาษาไทย"""
                 ]
 
                 print("\n🤖 [Round 2] Generating final reasoning and answer...")
-                # Note: API might append to the existing assistant message or start a new one depending on provider
-                response2_raw = api_call(messages_r2, max_tokens=4096, temperature=0.7)
-                
-                # รวม Pre-fill กลับเข้าไปเพื่อให้ได้ Format สมบูรณ์
-                if not response2_raw.startswith("<think>"):
-                    response2 = prefill_text + response2_raw
-                else:
-                    response2 = response2_raw
+                response2 = api_call(messages_r2, max_tokens=4096, temperature=0.8)
 
-                # 🏁 Filtering & Cleaning (Aggressive Mode)
-                # 1. ลบทิ้งถ้าสั้นเกินไป
+                # 🏁 Filtering & Cleaning (ป้องกันข้อมูลขยะ)
                 if len(response2) < 100:
                     print(f"⚠️ Response too short ({len(response2)} chars), skipping...")
                     continue
 
-                # 2. ลบ <tool_call>... </tool_call> ทิ้งทั้งหมด (Global Cleaning)
-                response2_clean = re.sub(r'<tool_call>[\s\S]*?</tool_call>', '', response2)
-                
-                # 3. ลบขยะที่ชอบหลุดมาต้นประโยค (เช่น จุลภาค, ช่องว่างลึกลับ)
-                response2_clean = re.sub(r'^[\s,]+', '', response2_clean)
-
-                # 4. ลบ instruction template ที่หลุดออกมา (Meta-instructions)
-                response2_clean = re.sub(r'(วิเคราะห์โดยใช้ลำดับนี้|กติกาที่คุณต้องทำ|กติกาที่ต้องปฏิบัติตามอย่างเคร่งครัด).*?(?=จากข้อมูล|จากข้อเท็จจริง|\(วิเคราะห์เสริม|จากการตรวจสอบ)', '', response2_clean, flags=re.DOTALL | re.IGNORECASE).strip()
-
-                # 5. ถ้าไม่มี <think> (กรณี Pre-fill หลุด) ให้ใส่คืนให้
-                if "<think>" not in response2_clean:
-                    response2_clean = "<think>\n" + response2_clean
-                
-                # 6. Heal missing </think> if "คำตอบ:" exists
-                if "</think>" not in response2_clean and "คำตอบ:" in response2_clean:
-                    response2_clean = response2_clean.replace("คำตอบ:", "\n</think>\nคำตอบ:")
-                
-                # 🏁 Final Format Validation
-                has_think_open = "<think>" in response2_clean
-                has_think_close = "</think>" in response2_clean
-                has_answer = "คำตอบ:" in response2_clean
-
-                if not (has_think_open and has_think_close and has_answer):
-                    print(f"⚠️ Incomplete format (think_close: {has_think_close}, answer: {has_answer}), skipping...")
-                    continue
-
-                # ตรวจสอบว่ามีคำตอบภาษาไทยไหม (Simple check)
-                if not any('\u0e00' <= char <= '\u0e7f' for char in response2_clean):
-                    print("⚠️ Response seems to be non-Thai, skipping...")
-                    continue
+                # ล้างขยะพวก <tool_call> ที่หลุดมา (ลบทั้งก้อนไม่ว่าจะอยู่ที่ไหน)
+                response2_clean = re.sub(r'<tool_call>[\s\S]*?</tool_call>', '', response2).strip()
+                response2_clean = re.sub(r'<tool_call>\s*', '', response2_clean).strip()
 
                 # ── Stitch together for SFT format ──
                 # เราใช้ format ที่ User กำหนดไว้เพื่อให้ตอน inference ใช้งานได้จริง
