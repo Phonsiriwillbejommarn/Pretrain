@@ -11,11 +11,13 @@ cd "$SCRIPT_DIR"
 MODEL="Qwen/Qwen3.5-9B-Base"
 DATA_PATH="../data/cleaned/thai_legal_pretrain.jsonl"
 OUTPUT_DIR="./output/qwen3.5-9b-thai-law-cpt"
+CHECKPOINT_DIR="$OUTPUT_DIR/last-checkpoint"
 
 # Hugging Face Hub (ใส่ Token ใน Environment Variable: export HF_TOKEN="your_token")
 HF_TOKEN=${HF_TOKEN:-""}
 HUB_MODEL_ID="Phonsiri/Qwen3.5-9B-Thai-Law-Base"
 DATASET_REPO="Phonsiri/Somdataset"
+CHECKPOINT_REPO="Phonsiri/Qwen3.5-9B-Thai-Law-Base"
 
 # Weights & Biases (ใส่ Token ที่นี่ถ้าต้องการ Track Log)
 export WANDB_API_KEY=""
@@ -25,10 +27,23 @@ export WANDB_NAME="run-1-cpt-H100"
 mkdir -p $OUTPUT_DIR
 mkdir -p "../data/cleaned"
 
-# --- Cloud Data Pull ---
-echo "📥 Downloading dataset from Hugging Face Hub (via Python)..."
-export HF_TOKEN=$HF_TOKEN
-python "$SCRIPT_DIR/download_cpt_data.py" --repo_id "$DATASET_REPO" --filename "thai_legal_pretrain.jsonl" --local-dir "$SCRIPT_DIR/../data/cleaned"
+# --- Cloud Data Pull (Dataset) ---
+if [ ! -f "../data/cleaned/thai_legal_pretrain.jsonl" ]; then
+    echo "📥 Downloading dataset from Hugging Face Hub (via Python)..."
+    export HF_TOKEN=$HF_TOKEN
+    python "$SCRIPT_DIR/download_cpt_data.py" --repo_id "$DATASET_REPO" --filename "thai_legal_pretrain.jsonl" --local-dir "$SCRIPT_DIR/../data/cleaned"
+else
+    echo "✅ Dataset already exists localy."
+fi
+
+# --- Checkpoint Pull (Resume Logic) ---
+if [ ! -f "$CHECKPOINT_DIR/config.json" ]; then
+    echo "🔍 Checkpoint not found localy. Attempting to pull from $CHECKPOINT_REPO..."
+    mkdir -p "$CHECKPOINT_DIR"
+    python "$SCRIPT_DIR/download_checkpoint.py" --repo_id "$CHECKPOINT_REPO" --local_dir "$CHECKPOINT_DIR"
+else
+    echo "✅ Checkpoint exists. Preparing to resume..."
+fi
 # ----------------------
 
 # Hyperparameters
@@ -37,6 +52,12 @@ NUM_EPOCHS=1
 BATCH_SIZE=2                         # per-device batch size
 GRAD_ACCUM=32                        # effective batch = 64 (เพิ่มเพื่อรักษา stability เมื่อ seq len ลดลง)
 LR=2e-5                              # CPT LR
+
+# ตรวจสอบว่ามี checkpoint หรือไม่ เพื่อส่งเข้า train.py
+RESUME_FLAG=""
+if [ -f "$CHECKPOINT_DIR/config.json" ]; then
+    RESUME_FLAG="--resume_from_checkpoint $CHECKPOINT_DIR"
+fi
 
 CUDA_VISIBLE_DEVICES=0 python train.py \
     --model "$MODEL" \
@@ -55,6 +76,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --gradient_checkpointing \
     --attn_implementation sdpa \
     --report_to all \
+    $RESUME_FLAG \
     ${HF_TOKEN:+--push_to_hub} \
     ${HF_TOKEN:+--hub_token "$HF_TOKEN"} \
     ${HUB_MODEL_ID:+--hub_model_id "$HUB_MODEL_ID"}
