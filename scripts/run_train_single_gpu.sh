@@ -66,9 +66,12 @@ LR=2e-5                              # CPT LR
 
 # ตรวจสอบว่ามี checkpoint หรือไม่ เพื่อส่งเข้า train.py
 RESUME_FLAG=""
-if [ -f "$CHECKPOINT_DIR/config.json" ]; then
-    RESUME_FLAG="--resume_from_checkpoint $CHECKPOINT_DIR"
-    echo "🔄 Found valid checkpoint, enabling Resume mode."
+# ค้นหาโฟลเดอร์ที่มี trainer_state.json จริงๆ (เผื่อซ้อนโฟลเดอร์จากการโหลด)
+ACTUAL_CKPT=$(find "$CHECKPOINT_DIR" -name "trainer_state.json" -exec dirname {} \; | head -n 1)
+
+if [ -n "$ACTUAL_CKPT" ] && [ -f "$ACTUAL_CKPT/config.json" ]; then
+    RESUME_FLAG="--resume_from_checkpoint $ACTUAL_CKPT"
+    echo "🔄 Found valid checkpoint at $ACTUAL_CKPT, enabling Resume mode."
 fi
 
 echo "🚀 Launching Training..."
