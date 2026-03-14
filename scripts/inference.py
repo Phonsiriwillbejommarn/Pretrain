@@ -8,14 +8,26 @@ def main():
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
-    print(f"🔄 Loading model from: {args.model_path}...")
+    print(f"🔄 Checking path: {args.model_path}...")
     
+    # แปลงเป็น Absolute Path เพื่อให้ transformers มั่นใจว่าเป็นเครื่องเรา ไม่ใช่ Repo ID
+    model_path = os.path.abspath(args.model_path)
+    
+    # ระบบค้นหาอัตโนมัติ: ถ้าในโฟลเดอร์ที่ส่งมาไม่มี config.json ให้ลองหาในทายาท (เผื่อซ้อนโฟลเดอร์)
+    if not os.path.exists(os.path.join(model_path, "config.json")):
+        print("🔍 config.json not found in root. Searching in subdirectories...")
+        for root, dirs, files in os.walk(model_path):
+            if "config.json" in files:
+                model_path = root
+                print(f"📍 Found valid model files at: {model_path}")
+                break
+
     # Load Tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     
     # Load Model
     model = AutoModelForCausalLM.from_pretrained(
-        args.model_path,
+        model_path,
         torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
         trust_remote_code=True,
         device_map=args.device
