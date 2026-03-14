@@ -27,7 +27,7 @@ def download_checkpoint(repo_id, local_dir, token=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download model checkpoint from HF Hub using Python")
     parser.add_argument("--repo_id", type=str, required=True, help="HF Model repository ID")
-    parser.add_argument("--local_dir", type=str, required=True, help="Local directory to save (e.g., ./output/last-checkpoint)")
+    parser.add_argument("--local-dir", dest="local_dir", type=str, required=True, help="Local directory to save (e.g., ./output/last-checkpoint)")
     
     args = parser.parse_args()
     

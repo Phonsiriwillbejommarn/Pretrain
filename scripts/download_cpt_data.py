@@ -44,7 +44,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download dataset from HF Hub using Python")
     parser.add_argument("--repo_id", type=str, required=True, help="HF Dataset repository ID")
     parser.add_argument("--filename", type=str, default="thai_legal_pretrain.jsonl", help="Filename to download")
-    parser.add_argument("--local_dir", type=str, default="../data/cleaned", help="Local directory to save")
+    parser.add_argument("--local-dir", dest="local_dir", type=str, default="../data/cleaned", help="Local directory to save")
     
     args = parser.parse_args()
     

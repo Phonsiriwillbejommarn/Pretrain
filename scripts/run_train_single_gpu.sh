@@ -51,7 +51,7 @@ fi
 if [ ! -f "$CHECKPOINT_DIR/config.json" ]; then
     echo "🔍 Checkpoint not found locally. Attempting to pull from $CHECKPOINT_REPO..."
     mkdir -p "$CHECKPOINT_DIR"
-    python "$SCRIPT_DIR/download_checkpoint.py" --repo_id "$CHECKPOINT_REPO" --local_dir "$CHECKPOINT_DIR" || echo "⚠️ Skip checkpoint download (might be first run)"
+    python "$SCRIPT_DIR/download_checkpoint.py" --repo_id "$CHECKPOINT_REPO" --local-dir "$CHECKPOINT_DIR" || echo "⚠️ Skip checkpoint download (might be first run)"
 else
     echo "✅ Checkpoint exists. Preparing to resume..."
 fi
