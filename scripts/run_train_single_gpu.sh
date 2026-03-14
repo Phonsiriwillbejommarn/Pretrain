@@ -9,8 +9,9 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$SCRIPT_DIR"
 
 MODEL="Qwen/Qwen3.5-9B-Base"
-DATA_PATH="../data/cleaned/thai_legal_pretrain.jsonl"
-OUTPUT_DIR="./output/qwen3.5-9b-thai-law-cpt"
+# ใช้ Absolute Path เสมอเพื่อให้ Python ชัวร์
+DATA_PATH="$SCRIPT_DIR/../data/cleaned/thai_legal_pretrain.jsonl"
+OUTPUT_DIR="$SCRIPT_DIR/output/qwen3.5-9b-thai-law-cpt"
 CHECKPOINT_DIR="$OUTPUT_DIR/last-checkpoint"
 
 # Hugging Face Hub (ใส่ Token ใน Environment Variable: export HF_TOKEN="your_token")
